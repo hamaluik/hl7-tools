@@ -39,21 +39,12 @@ fn write_path(stdout: &mut StandardStream, path: &[String]) -> Result<()> {
 
 fn write_value(stdout: &mut StandardStream, value: &str) -> Result<()> {
     // theme: rose-pine
-    let mut hl_number = ColorSpec::new();
-    hl_number.set_fg(Some(Color::Rgb(235, 188, 186)));
     let mut hl_value = ColorSpec::new();
     hl_value.set_fg(Some(Color::Rgb(224, 222, 244)));
 
-    let is_number = value.parse::<f64>().is_ok();
-    if is_number {
-        stdout
-            .set_color(&hl_number)
-            .wrap_err_with(|| "Failed to set stdout colour")?;
-    } else {
-        stdout
-            .set_color(&hl_value)
-            .wrap_err_with(|| "Failed to set stdout colour")?;
-    }
+    stdout
+        .set_color(&hl_value)
+        .wrap_err_with(|| "Failed to set stdout colour")?;
     write!(stdout, "{value}").wrap_err_with(|| "Failed to write to stdout")?;
     stdout
         .reset()
@@ -130,37 +121,6 @@ pub fn print_message_table(message: ParsedMessageOwned, cli: &Cli) -> Result<()>
                     }
                 }
                 current_path.pop();
-                // else {
-                //     for (repeat_i, repeat) in field.repeats.iter().enumerate() {
-                //         let repeat_name = format!("[{}]", repeat_i + 1);
-                //         current_path.push(repeat_name);
-                //         if repeat.components.is_empty() {
-                //             let value = repeat.source(&message.source);
-                //             println!("{path}\t{value}", path=current_path.join("."));
-                //             current_path.pop();
-                //         }
-                //         else {
-                //             for (component_i, component) in repeat.components.iter().enumerate() {
-                //                 let component_name = format!("{}", component_i + 1);
-                //                 current_path.push(component_name);
-                //                 if component.sub_components.is_empty() {
-                //                     let value = component.source(&message.source);
-                //                     println!("{path}\t{value}", path=current_path.join("."));
-                //                     current_path.pop();
-                //                 }
-                //                 else {
-                //                     for (sub_component_i, sub_component) in component.sub_components.iter().enumerate() {
-                //                         let sub_component_name = format!("{}", sub_component_i + 1);
-                //                         current_path.push(sub_component_name);
-                //                         let value = sub_component.source(&message.source);
-                //                         println!("{path}\t{value}", path=current_path.join("."));
-                //                         current_path.pop();
-                //                     }
-                //                 }
-                //             }
-                //         }
-                //     }
-                // }
             }
             current_path.pop();
         }

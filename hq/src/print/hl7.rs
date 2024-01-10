@@ -86,7 +86,7 @@ pub fn print_message_hl7(message: ParsedMessageOwned, cli: &Cli) -> Result<()> {
     stdout
         .reset()
         .wrap_err_with(|| "Failed to reset stdout colour")?;
-    writeln!(stdout).wrap_err_with(|| "Failed to write new line to stdout")?;
+    println!();
 
     Ok(())
 }
