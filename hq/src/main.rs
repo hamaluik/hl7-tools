@@ -1,11 +1,12 @@
 use cli::Cli;
 use color_eyre::eyre::{Context, Result};
 use hl7_parser::ParsedMessageOwned;
-use std::{io::Write, ops::Range};
-use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
+use termcolor::StandardStream;
 
 mod cli;
 mod map;
+mod print;
+pub use print::*;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -35,8 +36,22 @@ fn main() -> Result<()> {
         .wrap_err_with(|| "Failed to parse input as HL7 message")?;
 
     let message = apply_maps(message, &cli).wrap_err_with(|| "Failed to apply value mappings")?;
-    print_message(message, &cli).wrap_err_with(|| "Failed to print message")?;
-    Ok(())
+
+    if cli.query.is_empty() {
+        match cli.output {
+            cli::OutputMode::HL7 => {
+                print_message_hl7(message, &cli).wrap_err_with(|| "Failed to print message")
+            }
+            cli::OutputMode::Json => {
+                print_message_json(message, &cli).wrap_err_with(|| "Failed to print queries")
+            }
+            cli::OutputMode::Table => {
+                print_message_table(message, &cli).wrap_err_with(|| "Failed to print queries")
+            }
+        }
+    } else {
+        print_query_results(message, &cli).wrap_err_with(|| "Failed to print queries")
+    }
 }
 
 fn apply_maps(mut message: ParsedMessageOwned, cli: &Cli) -> Result<ParsedMessageOwned> {
@@ -64,105 +79,19 @@ fn apply_maps(mut message: ParsedMessageOwned, cli: &Cli) -> Result<ParsedMessag
     Ok(message)
 }
 
-fn print_message(message: ParsedMessageOwned, cli: &Cli) -> Result<()> {
-    // theme: rose-pine
-    let mut hl_segment = ColorSpec::new();
-    hl_segment.set_fg(Some(Color::Rgb(156, 207, 216)));
-    let mut hl_special_char = ColorSpec::new();
-    hl_special_char.set_fg(Some(Color::Rgb(144, 140, 170)));
-    let mut hl_number = ColorSpec::new();
-    hl_number.set_fg(Some(Color::Rgb(235, 188, 186)));
-    let mut hl_value = ColorSpec::new();
-    hl_value.set_fg(Some(Color::Rgb(224, 222, 244)));
-
+fn open_stdout(cli: &Cli) -> StandardStream {
     let colour = match cli.colour {
         clap::ColorChoice::Auto => termcolor::ColorChoice::Auto,
         clap::ColorChoice::Always => termcolor::ColorChoice::Always,
         clap::ColorChoice::Never => termcolor::ColorChoice::Never,
     };
-    let mut stdout = StandardStream::stdout(colour);
-
-    // this is awful but it basically works
-    let mut value_ranges: Vec<Range<usize>> = Vec::new();
-    let mut number_ranges: Vec<Range<usize>> = Vec::new();
-    let mut segment_identifier_ranges: Vec<Range<usize>> = Vec::new();
-    for segments in message.segments.values() {
-        for segment in segments.iter() {
-            let segment_id_range = segment.range.start..segment.range.start + 3;
-            segment_identifier_ranges.push(segment_id_range);
-            for field in segment.fields.iter() {
-                if field.repeats.is_empty() {
-                    value_ranges.push(field.range.clone());
-                    if field.source(&message.source).parse::<f64>().is_ok() {
-                        number_ranges.push(field.range.clone());
-                    }
-                }
-                for repeat in field.repeats.iter() {
-                    if repeat.components.is_empty() {
-                        value_ranges.push(repeat.range.clone());
-                        if repeat.source(&message.source).parse::<f64>().is_ok() {
-                            number_ranges.push(repeat.range.clone());
-                        }
-                    }
-                    for component in repeat.components.iter() {
-                        if component.sub_components.is_empty() {
-                            value_ranges.push(component.range.clone());
-                            if component.source(&message.source).parse::<f64>().is_ok() {
-                                number_ranges.push(component.range.clone());
-                            }
-                        }
-                        for sub_component in component.sub_components.iter() {
-                            value_ranges.push(sub_component.range.clone());
-                            if sub_component.source(&message.source).parse::<f64>().is_ok() {
-                                number_ranges.push(sub_component.range.clone());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    for (i, c) in message.source.chars().enumerate() {
-        let mut hl = None;
-        if segment_identifier_ranges.iter().any(|r| r.contains(&i)) {
-            hl = Some(&hl_segment);
-        } else if number_ranges.iter().any(|r| r.contains(&i)) {
-            hl = Some(&hl_number);
-        } else if value_ranges.iter().any(|r| r.contains(&i)) {
-            hl = Some(&hl_value);
-        } else if message.separators.is_special_char(c) {
-            hl = Some(&hl_special_char);
-        }
-
-        if let Some(hl) = hl {
-            stdout
-                .set_color(hl)
-                .wrap_err_with(|| "Failed to set stdout colour")?;
-        }
-        if c == '\r' {
-            writeln!(stdout).wrap_err_with(|| "Failed to write new line to stdout")?;
-        } else {
-            write!(stdout, "{}", c).wrap_err_with(|| "Failed to write character to stdout")?;
-        }
-        // if hl.is_some() {
-        //     stdout
-        //         .reset()
-        //         .wrap_err_with(|| "Failed to reset stdout colour")?;
-        // }
-    }
-    stdout
-        .reset()
-        .wrap_err_with(|| "Failed to reset stdout colour")?;
-    writeln!(stdout).wrap_err_with(|| "Failed to write new line to stdout")?;
-
-    Ok(())
+    StandardStream::stdout(colour)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map::*;
+    use crate::{cli::OutputMode, map::*};
     use clap::ColorChoice;
     use hl7_parser::LocationQuery;
 
@@ -183,6 +112,8 @@ mod tests {
             no_correct_newlines: false,
             colour: ColorChoice::Never,
             input: None,
+            output: OutputMode::HL7,
+            query: vec![],
         };
         let message = ParsedMessageOwned::parse(input).unwrap();
         let message = apply_maps(message, &cli).unwrap();
