@@ -42,6 +42,9 @@ pub struct Cli {
     pub query: Vec<LocationQuery>,
 
     #[arg(short, long, default_value_t = false)]
+    /// Don't correct newlines in the HL7 message
+    ///
+    /// By default, \r\n and \n will be converted to \r to separate segments
     pub no_correct_newlines: bool,
 
     #[arg(short, long, default_value_t = ColorChoice::Auto)]

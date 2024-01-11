@@ -1,0 +1,20 @@
+[package]
+name = "hs"
+version = "0.1.0"
+edition = "2021"
+authors = ["Kenton Hamaluik <kenton@hamaluik.ca>"]
+description = "Send and receive HL7v2 messages over MLLP"
+
+[dependencies]
+bytes = "1.5.0"
+clap = { version = "4.4.14", features = ["derive", "cargo", "wrap_help"] }
+color-eyre = "0.6.2"
+futures = "0.3.30"
+hl7-mllp-codec = "0.4.0"
+strip-ansi-escapes = "0.2.0"
+termcolor = "1.4.1"
+tokio = { version = "1.35.1", features = ["full"] }
+tokio-util = "0.7.10"
+hl7-parser = { path = "../../hl7-parser", version = "0.0.1" }
+rand = "0.8.5"
+chrono = "0.4.31"

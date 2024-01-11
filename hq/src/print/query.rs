@@ -15,6 +15,8 @@ pub fn print_query_results(message: ParsedMessageOwned, cli: &Cli) -> Result<()>
             )
         })?;
         if let Some(value) = value {
+            let value = message.separators.decode(value);
+
             for c in value.chars() {
                 if message.separators.is_special_char(c) {
                     stdout
