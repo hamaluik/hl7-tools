@@ -24,6 +24,7 @@ fn main() -> Result<()> {
             .wrap_err_with(|| "Failed to read from stdin")?;
         input
     };
+    let input = strip_ansi_escapes::strip_str(input);
 
     let input = if cli.no_correct_newlines {
         input
