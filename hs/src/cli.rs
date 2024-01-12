@@ -1,7 +1,7 @@
-use clap::{Parser, Subcommand, ColorChoice, ValueEnum};
+use clap::{ColorChoice, Parser, Subcommand, ValueEnum};
 use std::{
     net::{SocketAddr, ToSocketAddrs},
-    path::PathBuf
+    path::PathBuf,
 };
 
 #[derive(Parser, Debug)]
@@ -40,7 +40,6 @@ pub enum Command {
     ///
     /// The HL7 message will be read from stdin or from a file
     Send {
-
         #[arg(short, long, default_value_t = 10.0)]
         /// The number of seconds to wait for an ACK response before timing out
         ///

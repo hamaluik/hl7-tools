@@ -12,8 +12,9 @@ use tokio_util::codec::Framed;
 
 mod ack;
 mod cli;
+mod print;
 
-fn log<S: Display>(s: S, level: u8, stdout: &mut StandardStream) -> Result<()> {
+fn log<S: Display>(s: S, level: u8, stderr: &mut StandardStream) -> Result<()> {
     let mut colour = ColorSpec::new();
     let colour = match level {
         1 => colour.set_fg(Some(Color::Rgb(156, 207, 216))),
@@ -22,11 +23,11 @@ fn log<S: Display>(s: S, level: u8, stdout: &mut StandardStream) -> Result<()> {
         _ => colour.set_fg(Some(Color::White)),
     };
 
-    stdout
+    stderr
         .set_color(&colour)
         .wrap_err_with(|| "Failed to set terminal colour")?;
-    writeln!(stdout, "{}", s).wrap_err_with(|| "Failed to write to stdout/err")?;
-    stdout
+    writeln!(stderr, "{}", s).wrap_err_with(|| "Failed to write to stderr")?;
+    stderr
         .reset()
         .wrap_err_with(|| "Failed to reset terminal colour")?;
 
@@ -64,6 +65,7 @@ async fn main() -> Result<()> {
     let cli = cli::cli();
     let loglevel = cli.verbose;
     let mut stdout = open_stdout(&cli);
+    let mut stderr = open_stderr(&cli);
 
     match cli.command {
         cli::Command::Send {
@@ -73,11 +75,11 @@ async fn main() -> Result<()> {
             input,
         } => {
             let input = if let Some(input) = &input {
-                info!(stdout, loglevel, "Reading input from file: {:?}", input);
+                info!(stderr, loglevel, "Reading input from file: {:?}", input);
                 std::fs::read_to_string(input)
                     .wrap_err_with(|| format!("Failed to read input file: {:?}", input.display()))?
             } else {
-                info!(stdout, loglevel, "Reading input from stdin");
+                info!(stderr, loglevel, "Reading input from stdin");
                 use std::io::Read;
                 let mut input = String::new();
                 std::io::stdin()
@@ -86,20 +88,20 @@ async fn main() -> Result<()> {
                 input
             };
             let input = strip_ansi_escapes::strip_str(input);
-            trace!(stdout, loglevel, "Read input:\n{:?}", input);
+            trace!(stderr, loglevel, "Read input:\n{:?}", input);
 
             let input = if cli.no_correct_newlines {
-                trace!(stdout, loglevel, "Not correcting newlines");
+                trace!(stderr, loglevel, "Not correcting newlines");
                 input
             } else {
-                trace!(stdout, loglevel, "Correcting newlines");
+                trace!(stderr, loglevel, "Correcting newlines");
                 correct_newlines(&input)
             };
             let input = input.trim_end_matches('\r').to_string();
-            trace!(stdout, loglevel, "Corrected input:\n{:?}", input);
+            trace!(stderr, loglevel, "Corrected input:\n{:?}", input);
 
             if !no_parse {
-                debug!(stdout, loglevel, "Parsing input");
+                debug!(stderr, loglevel, "Parsing input");
                 hl7_parser::ParsedMessage::parse(&input)
                     .wrap_err_with(|| "Failed to parse input message")?;
             }
@@ -117,26 +119,34 @@ async fn main() -> Result<()> {
                 loglevel, "Connected to HL7 destination: {}", destination
             );
 
-            debug!(stdout, loglevel, "Sending message");
+            debug!(stderr, loglevel, "Sending message");
             transport
                 .send(BytesMut::from(input.as_bytes()))
                 .await
                 .wrap_err_with(|| "Failed to send message")?;
-            info!(stdout, loglevel, "Sent message");
+            info!(stderr, loglevel, "Sent message");
 
-            debug!(stdout, loglevel, "Waiting for response");
+            debug!(stderr, loglevel, "Waiting for response");
             let message_response = timeout(Duration::from_secs_f64(wait_time), transport.next())
                 .await
                 .ok()
                 .flatten();
             if let Some(received) = message_response {
-                info!(stdout, loglevel, "Received response");
+                info!(stderr, loglevel, "Received response");
                 let received = received.wrap_err_with(|| "Failed to receive response")?;
-                trace!(stdout, loglevel, "Response bytes:\n{:?}", received);
+                trace!(stderr, loglevel, "Response bytes:\n{:?}", received);
                 let message = String::from_utf8_lossy(&received);
-                print_message(message, &mut stdout).wrap_err_with(|| "Failed to print message")?;
+                if no_parse {
+                    print::print_message_nohl(message)
+                        .wrap_err_with(|| "Failed to print message")?;
+                } else {
+                    let message = hl7_parser::ParsedMessage::parse(&message)
+                        .wrap_err_with(|| "Failed to parse message")?;
+                    print::print_message_hl(&mut stdout, message)
+                        .wrap_err_with(|| "Failed to print message")?;
+                }
             } else {
-                info!(stdout, loglevel, "No response received");
+                info!(stderr, loglevel, "No response received");
             }
         }
         cli::Command::Listen {
@@ -144,72 +154,89 @@ async fn main() -> Result<()> {
             ack_mode,
             port,
         } => {
-            debug!(stdout, loglevel, "Starting to listen on 0.0.0.0:{}", port);
+            debug!(stderr, loglevel, "Starting to listen on 0.0.0.0:{}", port);
             let addr = SocketAddr::from(([0, 0, 0, 0], port));
             let listener = TcpListener::bind(&addr)
                 .await
                 .wrap_err_with(|| format!("Failed to start listening on {addr}"))?;
-            info!(stdout, loglevel, "Listening on 0.0.0.0:{}", port);
+            info!(stderr, loglevel, "Listening on 0.0.0.0:{}", port);
 
             let mut received_messages: usize = 0;
             'accept: loop {
-                let Ok((stream, _)) = listener.accept().await else {
-                    info!(stdout, loglevel, "Failed to accept connection");
+                let Ok((stream, remote)) = listener.accept().await else {
+                    info!(stderr, loglevel, "Failed to accept connection");
                     continue 'accept;
                 };
+                trace!(stderr, loglevel, "Remote connection: {:?}", remote);
 
                 let mut transport = Framed::new(stream, MllpCodec::new());
                 'messages: while let Some(result) = transport.next().await {
-                    trace!(stdout, loglevel, "Received message");
-                    trace!(stdout, loglevel, "Message bytes:\n{:?}", result);
+                    trace!(stderr, loglevel, "Received message");
+                    trace!(stderr, loglevel, "Message bytes:\n{:?}", result);
                     let Ok(message) = result else {
                         break 'messages;
                     };
                     let message = String::from_utf8_lossy(&message);
                     let message = if cli.no_correct_newlines {
-                        trace!(stdout, loglevel, "Not correcting newlines");
+                        trace!(stderr, loglevel, "Not correcting newlines");
                         message.to_string()
                     } else {
-                        trace!(stdout, loglevel, "Correcting newlines");
+                        trace!(stderr, loglevel, "Correcting newlines");
                         correct_newlines(message.as_ref())
                     };
 
                     let ack = match ack_mode {
                         cli::AckMode::Success => {
-                            debug!(stdout, loglevel, "Generating success ACK");
+                            debug!(stderr, loglevel, "Generating success ACK");
                             Some(
                                 ack::generate_ack(&message, cli::AckMode::Success)
                                     .wrap_err_with(|| "Failed to generate ACK")?,
                             )
                         }
                         cli::AckMode::Error => {
-                            debug!(stdout, loglevel, "Generating error ACK");
+                            debug!(stderr, loglevel, "Generating error ACK");
                             Some(
                                 ack::generate_ack(&message, cli::AckMode::Error)
                                     .wrap_err_with(|| "Failed to generate ACK")?,
                             )
                         }
                         cli::AckMode::Ignore => {
-                            debug!(stdout, loglevel, "Not generating ACK");
+                            debug!(stderr, loglevel, "Not generating ACK");
                             None
                         }
                     };
-                    if let Some((ack, _parsed_message)) = ack {
-                        info!(stdout, loglevel, "Sending ACK");
-                        debug!(stdout, loglevel, "ACK:\n{}", ack);
+                    let parsed_message = if let Some((ack, parsed_message)) = ack {
+                        info!(stderr, loglevel, "Sending ACK");
+                        debug!(stderr, loglevel, "ACK:\n{}", ack);
                         transport
                             .send(BytesMut::from(ack.as_bytes()))
                             .await
                             .wrap_err_with(|| "Failed to send ACK")?;
+                        Some(parsed_message)
+                    } else {
+                        None
+                    };
+                    if let Some(parsed_message) = parsed_message {
+                        print::print_message_hl(&mut stdout, parsed_message)
+                            .wrap_err_with(|| "Failed to print message")?;
+                    } else {
+                        print::print_message_nohl(&message)
+                            .wrap_err_with(|| "Failed to print message")?;
                     }
-                    print_message(message, &mut stdout)
-                        .wrap_err_with(|| "Failed to print message")?;
 
                     received_messages += 1;
-                    trace!(stdout, loglevel, "Received {} messages so far", received_messages);
+                    trace!(
+                        stderr,
+                        loglevel,
+                        "Received {} messages so far",
+                        received_messages
+                    );
                     if let Some(message_count) = message_count {
                         if received_messages >= message_count {
-                            info!(stdout, loglevel, "Received {} messages, quitting", received_messages);
+                            info!(
+                                stderr,
+                                loglevel, "Received {} messages, quitting", received_messages
+                            );
                             break 'accept;
                         }
                     }
@@ -227,16 +254,18 @@ fn open_stdout(cli: &cli::Cli) -> StandardStream {
         clap::ColorChoice::Always => termcolor::ColorChoice::Always,
         clap::ColorChoice::Never => termcolor::ColorChoice::Never,
     };
+    StandardStream::stdout(colour)
+}
+
+fn open_stderr(cli: &cli::Cli) -> StandardStream {
+    let colour = match cli.colour {
+        clap::ColorChoice::Auto => termcolor::ColorChoice::Auto,
+        clap::ColorChoice::Always => termcolor::ColorChoice::Always,
+        clap::ColorChoice::Never => termcolor::ColorChoice::Never,
+    };
     StandardStream::stderr(colour)
 }
 
 fn correct_newlines(message: &str) -> String {
     message.replace("\r\n", "\r").replace('\n', "\r")
-}
-
-fn print_message<S: ToString>(message: S, stdout: &mut StandardStream) -> Result<()> {
-    let message = message.to_string().replace('\r', "\n");
-    writeln!(stdout, "{}", message).wrap_err_with(|| "Failed to write to stdout")?;
-    writeln!(stdout).wrap_err_with(|| "Failed to write to stdout")?;
-    Ok(())
 }

@@ -72,7 +72,10 @@ fn compose_ack(message: &ParsedMessage, success: bool) -> Result<String> {
         .query_value("MSH.12")
         .expect("valid query")
         .unwrap_or_default();
-    let trigger = message.query_value("MSH.9.2").expect("valid query").unwrap_or_default();
+    let trigger = message
+        .query_value("MSH.9.2")
+        .expect("valid query")
+        .unwrap_or_default();
 
     use rand::distributions::{Alphanumeric, DistString};
     let new_control_id = Alphanumeric.sample_string(&mut rand::thread_rng(), 20);
