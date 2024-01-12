@@ -5,13 +5,15 @@ use std::io::Write;
 use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 
 fn write_path(stdout: &mut StandardStream, path: &[String]) -> Result<()> {
-    // theme: rose-pine
     let mut hl_segment = ColorSpec::new();
-    hl_segment.set_fg(Some(Color::Rgb(156, 207, 216)));
     let mut hl_special_char = ColorSpec::new();
-    hl_special_char.set_fg(Some(Color::Rgb(144, 140, 170)));
     let mut hl_number = ColorSpec::new();
-    hl_number.set_fg(Some(Color::Rgb(235, 188, 186)));
+    let mut hl_value = ColorSpec::new();
+
+    hl_segment.set_fg(Some(Color::Cyan));
+    hl_special_char.set_fg(Some(Color::Black)).set_intense(true);
+    hl_number.set_fg(Some(Color::Yellow));
+    hl_value.set_fg(Some(Color::White)).set_intense(true);
 
     for (i, segment) in path.iter().enumerate() {
         if i > 0 {
@@ -38,9 +40,8 @@ fn write_path(stdout: &mut StandardStream, path: &[String]) -> Result<()> {
 }
 
 fn write_value(stdout: &mut StandardStream, value: &str) -> Result<()> {
-    // theme: rose-pine
     let mut hl_value = ColorSpec::new();
-    hl_value.set_fg(Some(Color::Rgb(224, 222, 244)));
+    hl_value.set_fg(Some(Color::White)).set_intense(true);
 
     stdout
         .set_color(&hl_value)

@@ -82,9 +82,9 @@ pub enum Command {
         /// The mode to use for sending ACKs
         ack_mode: AckMode,
 
-        #[arg(short, long, default_value_t = 2575, value_parser = clap::value_parser!(u16).range(1..))]
-        /// The port to listen on
-        port: u16,
+        #[arg(short, long, default_value = "127.0.0.1:2575", value_parser = parse_socket_addr)]
+        /// The address to bind to in the form of <host>:<port>
+        bind: SocketAddr,
     },
 }
 

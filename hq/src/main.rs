@@ -1,3 +1,5 @@
+use std::io::IsTerminal;
+
 use cli::Cli;
 use color_eyre::eyre::{Context, Result};
 use hl7_parser::ParsedMessageOwned;
@@ -85,6 +87,11 @@ fn open_stdout(cli: &Cli) -> StandardStream {
         clap::ColorChoice::Auto => termcolor::ColorChoice::Auto,
         clap::ColorChoice::Always => termcolor::ColorChoice::Always,
         clap::ColorChoice::Never => termcolor::ColorChoice::Never,
+    };
+    let colour = if !std::io::stdout().is_terminal() {
+        termcolor::ColorChoice::Never
+    } else {
+        colour
     };
     StandardStream::stdout(colour)
 }

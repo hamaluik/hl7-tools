@@ -7,15 +7,15 @@ use std::ops::Range;
 use std::io::Write;
 
 pub fn print_message_hl7(message: ParsedMessageOwned, cli: &Cli) -> Result<()> {
-    // theme: rose-pine
     let mut hl_segment = ColorSpec::new();
-    hl_segment.set_fg(Some(Color::Rgb(156, 207, 216)));
     let mut hl_special_char = ColorSpec::new();
-    hl_special_char.set_fg(Some(Color::Rgb(144, 140, 170)));
     let mut hl_number = ColorSpec::new();
-    hl_number.set_fg(Some(Color::Rgb(235, 188, 186)));
     let mut hl_value = ColorSpec::new();
-    hl_value.set_fg(Some(Color::Rgb(224, 222, 244)));
+
+    hl_segment.set_fg(Some(Color::Cyan));
+    hl_special_char.set_fg(Some(Color::Black)).set_intense(true);
+    hl_number.set_fg(Some(Color::White));
+    hl_value.set_fg(Some(Color::White)).set_intense(true);
 
     let mut stdout = open_stdout(cli);
 

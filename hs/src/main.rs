@@ -3,8 +3,8 @@ use color_eyre::eyre::{Context, Result};
 use futures::{SinkExt, StreamExt};
 use hl7_mllp_codec::MllpCodec;
 use std::fmt::Display;
-use std::io::Write;
-use std::{net::SocketAddr, time::Duration};
+use std::io::{IsTerminal, Write};
+use std::time::Duration;
 use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::time::timeout;
@@ -17,14 +17,14 @@ mod print;
 fn log<S: Display>(s: S, level: u8, stderr: &mut StandardStream) -> Result<()> {
     let mut colour = ColorSpec::new();
     let colour = match level {
-        1 => colour.set_fg(Some(Color::Rgb(156, 207, 216))),
-        2 => colour.set_fg(Some(Color::Rgb(246, 193, 119))),
-        3 => colour.set_fg(Some(Color::Rgb(49, 116, 143))),
+        1 => colour.set_fg(Some(Color::Cyan)),
+        2 => colour.set_fg(Some(Color::Magenta)),
+        3 => colour.set_fg(Some(Color::White)).set_dimmed(true),
         _ => colour.set_fg(Some(Color::White)),
     };
 
     stderr
-        .set_color(&colour)
+        .set_color(colour)
         .wrap_err_with(|| "Failed to set terminal colour")?;
     writeln!(stderr, "{}", s).wrap_err_with(|| "Failed to write to stderr")?;
     stderr
@@ -152,14 +152,13 @@ async fn main() -> Result<()> {
         cli::Command::Listen {
             message_count,
             ack_mode,
-            port,
+            bind,
         } => {
-            debug!(stderr, loglevel, "Starting to listen on 0.0.0.0:{}", port);
-            let addr = SocketAddr::from(([0, 0, 0, 0], port));
-            let listener = TcpListener::bind(&addr)
+            debug!(stderr, loglevel, "Starting to listen on {bind}");
+            let listener = TcpListener::bind(&bind)
                 .await
-                .wrap_err_with(|| format!("Failed to start listening on {addr}"))?;
-            info!(stderr, loglevel, "Listening on 0.0.0.0:{}", port);
+                .wrap_err_with(|| format!("Failed to start listening on {bind}"))?;
+            info!(stderr, loglevel, "Listening on {bind}");
 
             let mut received_messages: usize = 0;
             'accept: loop {
@@ -254,6 +253,11 @@ fn open_stdout(cli: &cli::Cli) -> StandardStream {
         clap::ColorChoice::Always => termcolor::ColorChoice::Always,
         clap::ColorChoice::Never => termcolor::ColorChoice::Never,
     };
+    let colour = if !std::io::stdout().is_terminal() {
+        termcolor::ColorChoice::Never
+    } else {
+        colour
+    };
     StandardStream::stdout(colour)
 }
 
@@ -262,6 +266,11 @@ fn open_stderr(cli: &cli::Cli) -> StandardStream {
         clap::ColorChoice::Auto => termcolor::ColorChoice::Auto,
         clap::ColorChoice::Always => termcolor::ColorChoice::Always,
         clap::ColorChoice::Never => termcolor::ColorChoice::Never,
+    };
+    let colour = if !std::io::stderr().is_terminal() {
+        termcolor::ColorChoice::Never
+    } else {
+        colour
     };
     StandardStream::stderr(colour)
 }

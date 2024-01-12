@@ -17,15 +17,20 @@ pub fn print_query_results(message: ParsedMessageOwned, cli: &Cli) -> Result<()>
         if let Some(value) = value {
             let value = message.separators.decode(value);
 
+            let mut hl_special_char = ColorSpec::new();
+            let mut hl_value = ColorSpec::new();
+            hl_special_char.set_fg(Some(Color::Black)).set_intense(true);
+            hl_value.set_fg(Some(Color::White)).set_intense(true);
+
             for c in value.chars() {
                 if message.separators.is_special_char(c) {
                     stdout
-                        .set_color(ColorSpec::new().set_fg(Some(Color::Rgb(144, 140, 170))))
+                        .set_color(&hl_special_char)
                         .wrap_err_with(|| "Failed to set stdout colour")?;
                 }
                 else {
                     stdout
-                        .set_color(ColorSpec::new().set_fg(Some(Color::Rgb(224, 222, 244))))
+                        .set_color(&hl_value)
                         .wrap_err_with(|| "Failed to set stdout colour")?;
                 }
                 write!(stdout, "{c}").wrap_err_with(|| "Failed to write to stdout")?;

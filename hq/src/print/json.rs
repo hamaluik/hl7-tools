@@ -5,13 +5,14 @@ use hl7_parser::ParsedMessageOwned;
 use serde_json::{Map, Value};
 use std::io::Write;
 use syntect::{
-    highlighting::{Style, ThemeSet},
+    highlighting::{self, Style, ThemeSet},
     parsing::{SyntaxDefinition, SyntaxSetBuilder},
-    util::{as_24_bit_terminal_escaped, LinesWithEndings},
+    util::LinesWithEndings,
 };
+use termcolor::{Color, ColorSpec, WriteColor};
 
-const JSON_SYNTAX: &'static str = include_str!("../../assets/JSON.sublime-syntax");
-const THEME: &'static [u8] = include_bytes!("../../assets/rose-pine.tmTheme");
+const JSON_SYNTAX: &str = include_str!("../../assets/JSON.sublime-syntax");
+const THEME: &[u8] = include_bytes!("../../assets/ansi.tmTheme");
 
 fn sub_components_to_json(
     sub_components: &[hl7_parser::SubComponent],
@@ -149,14 +150,46 @@ pub fn print_message_json(message: ParsedMessageOwned, cli: &Cli) -> Result<()> 
         let mut stdout = crate::open_stdout(cli);
 
         for line in LinesWithEndings::from(&json) {
-            let ranges: Vec<(Style, &str)> = highlighter
+            let spans: Vec<(Style, &str)> = highlighter
                 .highlight_line(line, &syntaxes)
                 .wrap_err_with(|| "Can't highlight line")?;
-            let escaped = as_24_bit_terminal_escaped(&ranges[..], false);
-            write!(stdout, "{}", escaped)?;
+
+            for (style, text) in spans.into_iter() {
+                let fg = to_ansi_color(style.foreground);
+                let mut spec = ColorSpec::new();
+                spec.set_fg(fg);
+
+                stdout
+                    .set_color(&spec)
+                    .wrap_err_with(|| "Can't set color")?;
+                write!(stdout, "{text}").wrap_err_with(|| "Can't write to buffer")?;
+            }
         }
+
+        stdout.reset().wrap_err_with(|| "Can't reset stdout")?;
     }
     println!();
 
     Ok(())
+}
+
+/// source: https://github.com/sharkdp/bat/blob/cd81c7fa6bf0d061f455f67aae72dc5537f7851d/src/terminal.rs#L6
+fn to_ansi_color(color: highlighting::Color) -> Option<Color> {
+    if color.a == 0 {
+        Some(match color.r {
+            0x00 => Color::Black,
+            0x01 => Color::Red,
+            0x02 => Color::Green,
+            0x03 => Color::Yellow,
+            0x04 => Color::Blue,
+            0x05 => Color::Magenta,
+            0x06 => Color::Cyan,
+            0x07 => Color::White,
+            n => Color::Ansi256(n),
+        })
+    } else if color.a == 1 {
+        None
+    } else {
+        Some(Color::Rgb(color.r, color.g, color.b))
+    }
 }
