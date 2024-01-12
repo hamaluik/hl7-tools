@@ -1,9 +1,13 @@
 [package]
-name = "hq"
+name = "hl7-query"
 version = "0.1.0"
 edition = "2021"
 authors = ["Kenton Hamaluik <kenton@hamaluik.ca>"]
 description = "A command-line tool for parsing and manipulating HL7 messages"
+
+[[bin]]
+name = "hq"
+path = "src/main.rs"
 
 [dependencies]
 chrono = "0.4.31"

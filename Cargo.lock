@@ -499,7 +499,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hq"
+name = "hl7-query"
 version = "0.1.0"
 dependencies = [
  "chrono",
@@ -516,7 +516,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hs"
+name = "hl7-send-receive"
 version = "0.1.0"
 dependencies = [
  "bytes",

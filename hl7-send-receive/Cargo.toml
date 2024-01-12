@@ -1,9 +1,15 @@
 [package]
-name = "hs"
+name = "hl7-send-receive"
 version = "0.1.0"
 edition = "2021"
 authors = ["Kenton Hamaluik <kenton@hamaluik.ca>"]
 description = "Send and receive HL7v2 messages over MLLP"
+keywords = ["hl7", "mllp", "tcp", "cli"]
+categories = ["network-programming", "cli", "science"]
+
+[[bin]]
+name = "hs"
+path = "src/main.rs"
 
 [dependencies]
 bytes = "1.5.0"

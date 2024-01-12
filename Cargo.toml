@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "hq",
-    "hs",
+    "hl7-query",
+    "hl7-send-receive",
 ]
 resolver = "2"
