@@ -102,7 +102,7 @@ async fn main() -> Result<()> {
 
             if !no_parse {
                 debug!(stderr, loglevel, "Parsing input");
-                hl7_parser::ParsedMessage::parse(&input)
+                hl7_parser::ParsedMessage::parse(&input, false)
                     .wrap_err_with(|| "Failed to parse input message")?;
             }
 
@@ -140,7 +140,7 @@ async fn main() -> Result<()> {
                     print::print_message_nohl(message)
                         .wrap_err_with(|| "Failed to print message")?;
                 } else {
-                    let message = hl7_parser::ParsedMessage::parse(&message)
+                    let message = hl7_parser::ParsedMessage::parse(&message, false)
                         .wrap_err_with(|| "Failed to parse message")?;
                     print::print_message_hl(&mut stdout, message)
                         .wrap_err_with(|| "Failed to print message")?;

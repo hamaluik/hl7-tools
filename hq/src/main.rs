@@ -35,7 +35,7 @@ fn main() -> Result<()> {
     };
     let input = input.trim_end_matches('\r').to_string();
 
-    let message = ParsedMessageOwned::parse(input)
+    let message = ParsedMessageOwned::parse(input, false)
         .wrap_err_with(|| "Failed to parse input as HL7 message")?;
 
     let message = apply_maps(message, &cli).wrap_err_with(|| "Failed to apply value mappings")?;
@@ -75,7 +75,7 @@ fn apply_maps(mut message: ParsedMessageOwned, cli: &Cli) -> Result<ParsedMessag
         if let Some(range) = range {
             let value = map.to.reify(query);
             message.source.replace_range(range, &value);
-            message = ParsedMessageOwned::parse(&message.source)
+            message = ParsedMessageOwned::parse(&message.source, false)
                 .wrap_err_with(|| format!("Failed to re-parse message after applying map {map}"))?;
         }
     }
@@ -123,7 +123,7 @@ mod tests {
             output: OutputMode::HL7,
             query: vec![],
         };
-        let message = ParsedMessageOwned::parse(input).unwrap();
+        let message = ParsedMessageOwned::parse(input, false).unwrap();
         let message = apply_maps(message, &cli).unwrap();
         assert_eq!(
             message.source,

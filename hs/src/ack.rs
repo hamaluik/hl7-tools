@@ -7,7 +7,7 @@ pub fn generate_ack(message: &str, ack_mode: AckMode) -> Result<(String, ParsedM
     match ack_mode {
         AckMode::Success => {
             let message =
-                ParsedMessage::parse(message).wrap_err_with(|| "Failed to parse message")?;
+                ParsedMessage::parse(message, false).wrap_err_with(|| "Failed to parse message")?;
             Ok((
                 compose_ack(&message, true).wrap_err_with(|| "Failed to compose ACK")?,
                 message,
@@ -15,7 +15,7 @@ pub fn generate_ack(message: &str, ack_mode: AckMode) -> Result<(String, ParsedM
         }
         AckMode::Error => {
             let message =
-                ParsedMessage::parse(message).wrap_err_with(|| "Failed to parse message")?;
+                ParsedMessage::parse(message, false).wrap_err_with(|| "Failed to parse message")?;
             Ok((
                 compose_ack(&message, false).wrap_err_with(|| "Failed to compose ACK")?,
                 message,
