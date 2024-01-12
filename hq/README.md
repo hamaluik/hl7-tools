@@ -8,10 +8,12 @@ using and manipulating HL7 messages via a composable command-line workflow.
 - [X] Parse HL7 messages
 - [ ] Validate HL7 message structure
 - [X] Map field values to new values (ex: set `MSH.10` to "1234")
-- [ ] Query field values (ex: "what is the value of `PID.5`?)
+- [X] Query field values (ex: "what is the value of `PID.5`?)
 - [X] Read from a file or stdin
 - [X] Map newlines to HL7 `\r` segment separators
 - [X] Print a (minimally) syntax-highlighted version of the message to stdout
+- [X] Print an easily greppable table of the message to stdout
+- [X] Print a JSON version of the message to stdout
 
 ## Non-Goals
 
